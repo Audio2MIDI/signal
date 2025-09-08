@@ -1,6 +1,5 @@
 import { useTheme } from "@emotion/react"
 import ChevronRight from "mdi-react/ChevronRightIcon"
-import CloudOutlined from "mdi-react/CloudOutlineIcon"
 import KeyboardArrowDown from "mdi-react/KeyboardArrowDownIcon"
 import { FC, useCallback, useState } from "react"
 import { hasFSAccess } from "../../actions/file"
@@ -52,7 +51,7 @@ export const FileMenuButton: FC = () => {
 
       {user && <CloudFileMenu close={handleClose} />}
 
-      {user === null && (
+      {/* {user === null && (
         <>
           <MenuDivider />
           <MenuItem
@@ -65,7 +64,7 @@ export const FileMenuButton: FC = () => {
             <Localized name="please-sign-up" />
           </MenuItem>
         </>
-      )}
+      )} */}
 
       <MenuDivider />
 

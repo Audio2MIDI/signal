@@ -31,7 +31,7 @@ export const Tab = styled.div`
   }
   &:active {
     background: ${({ theme }) =>
-      Color(theme.secondaryBackgroundColor).lighten(0.1).hex()};
+    Color(theme.secondaryBackgroundColor).lighten(0.1).hex()};
   }
 
   a {

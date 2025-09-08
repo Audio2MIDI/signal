@@ -1,5 +1,4 @@
 import styled from "@emotion/styled"
-import Forum from "mdi-react/ForumIcon"
 import Help from "mdi-react/HelpCircleIcon"
 import Settings from "mdi-react/SettingsIcon"
 import { CSSProperties, FC, MouseEvent, useCallback } from "react"
@@ -14,7 +13,6 @@ import { Localized } from "../../localize/useLocalization"
 import { Tooltip } from "../ui/Tooltip"
 import { EditMenuButton } from "./EditMenuButton"
 import { FileMenuButton } from "./FileMenuButton"
-import { UserButton } from "./UserButton"
 
 const Container = styled.div`
   display: flex;
@@ -206,7 +204,7 @@ export const Navigation: FC = () => {
             </TabTitle>
           </Tab>
 
-          <Tab>
+          {/* <Tab>
             <Forum style={IconStyle} />
             <TabTitle>
               <a
@@ -217,11 +215,11 @@ export const Navigation: FC = () => {
                 Discord
               </a>
             </TabTitle>
-          </Tab>
+          </Tab> */}
         </>
       )}
 
-      <UserButton />
+      {/* <UserButton /> */}
     </Container>
   )
 }
