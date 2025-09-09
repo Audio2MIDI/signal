@@ -81,6 +81,32 @@ export const useLoadSongFromExternalMidiFile = () => {
   }
 }
 
+// New function that loads MIDI files directly without Firebase
+export const useLoadSongFromDirectMidiUrl = () => {
+  return async (midiFileUrl: string) => {
+    try {
+      // Fetch the MIDI file directly from the URL
+      const response = await fetch(midiFileUrl)
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch MIDI file: ${response.status} ${response.statusText}`)
+      }
+      
+      // Convert response to ArrayBuffer
+      const arrayBuffer = await response.arrayBuffer()
+      
+      // Convert to song using the existing songFromMidi function
+      const song = songFromMidi(arrayBuffer)
+      song.name = basename(midiFileUrl) ?? ""
+      song.isSaved = false // Mark as not saved since it's loaded from external URL
+      
+      return song
+    } catch (error) {
+      throw new Error(`Failed to load MIDI file from URL: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+}
+
 export const usePublishSong = () => {
   return async (song: Song) => {
     const user = await userRepository.getCurrentUser()

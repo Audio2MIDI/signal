@@ -1,7 +1,7 @@
 import { useProgress } from "dialog-hooks"
 import { FC, useEffect, useState } from "react"
 import { useSetSong } from "../../actions"
-import { useLoadSongFromExternalMidiFile } from "../../actions/cloudSong"
+import { useLoadSongFromDirectMidiUrl } from "../../actions/cloudSong"
 import { songFromArrayBuffer } from "../../actions/file"
 import { isRunningInElectron } from "../../helpers/platform"
 import { useAutoSave } from "../../hooks/useAutoSave"
@@ -13,7 +13,7 @@ import { InitializeErrorDialog } from "./InitializeErrorDialog"
 export const OnInit: FC = () => {
   const rootStore = useStores()
   const setSong = useSetSong()
-  const loadSongFromExternalMidiFile = useLoadSongFromExternalMidiFile()
+  const loadSongFromDirectMidiUrl = useLoadSongFromDirectMidiUrl()
 
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
@@ -37,11 +37,26 @@ export const OnInit: FC = () => {
   const loadExternalMidiIfNeeded = async () => {
     const params = new URLSearchParams(window.location.search)
     const openParam = params.get("open")
+    const linkParam = params.get("link")
 
+    // Check for 'open' parameter first (existing functionality)
     if (openParam) {
       const closeProgress = showProgress(localized["loading-external-midi"])
       try {
-        const song = await loadSongFromExternalMidiFile(openParam)
+        const song = await loadSongFromDirectMidiUrl(openParam)
+        setSong(song)
+      } catch (e) {
+        setIsErrorDialogOpen(true)
+        setErrorMessage((e as Error).message)
+      } finally {
+        closeProgress()
+      }
+    }
+    // Check for 'link' parameter (new functionality)
+    else if (linkParam) {
+      const closeProgress = showProgress(localized["loading-external-midi"])
+      try {
+        const song = await loadSongFromDirectMidiUrl(linkParam)
         setSong(song)
       } catch (e) {
         setIsErrorDialogOpen(true)
@@ -76,7 +91,9 @@ export const OnInit: FC = () => {
     // Skip auto save restore if external file loading is present
     const params = new URLSearchParams(window.location.search)
     const openParam = params.get("open")
-    if (openParam) {
+    const linkParam = params.get("link")
+    
+    if (openParam || linkParam) {
       return
     }
 
