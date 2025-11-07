@@ -1,8 +1,22 @@
 services:
-  app:
+  signal:
     build: .
-    ports:
-      - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.signal.rule=Host(`edit.audio2midi.ru`)"
+      - "traefik.http.routers.signal.entrypoints=websecure"
+      - "traefik.http.routers.signal.tls.certresolver=letsEncrypt"
+      - "traefik.http.routers.signal.priority=100"
+      - "traefik.http.services.signal.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.signal-headers.headers.customResponseHeaders.X-Served-By=signal"
+      - "traefik.http.routers.signal.middlewares=signal-headers"
+      - "traefik.docker.network=web"
+    restart: always
+    networks: [ web ]
+
+networks:
+  web:
+    external: true
