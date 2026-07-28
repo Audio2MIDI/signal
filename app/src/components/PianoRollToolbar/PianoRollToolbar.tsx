@@ -1,5 +1,6 @@
 import styled from "@emotion/styled"
 import { FC } from "react"
+import { useAudio2MidiEditor } from "../../hooks/useAudio2MidiEditor"
 import { InstrumentBrowser } from "../InstrumentBrowser/InstrumentBrowser"
 import { AutoScrollButton } from "../Toolbar/AutoScrollButton"
 import { QuantizeSelector } from "../Toolbar/QuantizeSelector/QuantizeSelector"
@@ -21,21 +22,23 @@ const FlexibleSpacer = styled.div`
 `
 
 export const PianoRollToolbar: FC = () => {
+  const editor = useAudio2MidiEditor()
+  const showProControls = !editor.isEditorRoute || editor.mode === "pro"
   return (
     <Toolbar>
-      <TrackListMenuButton />
+      {showProControls && <TrackListMenuButton />}
 
       <TrackNameInput />
 
-      <EventListButton />
+      {showProControls && <EventListButton />}
 
       <Spacer />
 
-      <InstrumentButton />
-      <InstrumentBrowser />
+      {showProControls && <InstrumentButton />}
+      {showProControls && <InstrumentBrowser />}
 
-      <VolumeSlider />
-      <PanSlider />
+      {showProControls && <VolumeSlider />}
+      {showProControls && <PanSlider />}
 
       <FlexibleSpacer />
 

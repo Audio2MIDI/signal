@@ -22,6 +22,7 @@ const LanguageSelect: FC = () => {
   const { language, setLanguage } = useSettings()
   const currentLanguage = useCurrentLanguage()
   const items: LanguageItem[] = [
+    { label: "Русский", language: "ru" },
     { label: "English", language: "en" },
     { label: "French", language: "fr" },
     { label: "Japanese", language: "ja" },

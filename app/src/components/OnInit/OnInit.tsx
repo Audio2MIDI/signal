@@ -1,9 +1,7 @@
 import { useProgress } from "dialog-hooks"
 import { FC, useEffect, useState } from "react"
 import { useSetSong } from "../../actions"
-import { useLoadSongFromExternalMidiFile } from "../../actions/cloudSong"
 import { songFromArrayBuffer } from "../../actions/file"
-import { isRunningInElectron } from "../../helpers/platform"
 import { useAutoSave } from "../../hooks/useAutoSave"
 import { useStores } from "../../hooks/useStores"
 import { useLocalization } from "../../localize/useLocalization"
@@ -13,7 +11,6 @@ import { InitializeErrorDialog } from "./InitializeErrorDialog"
 export const OnInit: FC = () => {
   const rootStore = useStores()
   const setSong = useSetSong()
-  const loadSongFromExternalMidiFile = useLoadSongFromExternalMidiFile()
 
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
@@ -41,7 +38,15 @@ export const OnInit: FC = () => {
     if (openParam) {
       const closeProgress = showProgress(localized["loading-external-midi"])
       try {
-        const song = await loadSongFromExternalMidiFile(openParam)
+        const response = await fetch(openParam, { credentials: "omit" })
+        if (!response.ok) {
+          throw new Error(`MIDI download failed: HTTP ${response.status}`)
+        }
+        const song = songFromArrayBuffer(
+          await response.arrayBuffer(),
+          undefined,
+          "Audio2MIDI.mid",
+        )
         setSong(song)
       } catch (e) {
         setIsErrorDialogOpen(true)
@@ -52,44 +57,15 @@ export const OnInit: FC = () => {
     }
   }
 
-  const loadArgumentFileIfNeeded = async () => {
-    if (!isRunningInElectron()) {
+  const checkAutoSave = async () => {
+    if (rootStore.audio2MidiEditorService.isEditorRoute) {
       return
     }
-    const closeProgress = showProgress(localized["loading-file"])
-    try {
-      const filePath = await window.electronAPI.getArgument()
-      if (filePath) {
-        const data = await window.electronAPI.readFile(filePath)
-        const song = songFromArrayBuffer(data, filePath)
-        setSong(song)
-      }
-    } catch (e) {
-      setIsErrorDialogOpen(true)
-      setErrorMessage((e as Error).message)
-    } finally {
-      closeProgress()
-    }
-  }
-
-  const checkAutoSave = async () => {
     // Skip auto save restore if external file loading is present
     const params = new URLSearchParams(window.location.search)
     const openParam = params.get("open")
     if (openParam) {
       return
-    }
-
-    // Skip auto save restore if there's an argument file in Electron
-    if (isRunningInElectron()) {
-      try {
-        const filePath = await window.electronAPI.getArgument()
-        if (filePath) {
-          return
-        }
-      } catch {
-        // Continue if error occurs
-      }
     }
 
     // Check for auto save restore
@@ -101,8 +77,18 @@ export const OnInit: FC = () => {
   useEffect(() => {
     ;(async () => {
       await init()
+      if (rootStore.audio2MidiEditorService.isEditorRoute) {
+        try {
+          const song = await rootStore.audio2MidiEditorService.loadProject()
+          setSong(song)
+          rootStore.audio2MidiEditorService.markDocumentReady()
+        } catch (e) {
+          setIsErrorDialogOpen(true)
+          setErrorMessage((e as Error).message)
+        }
+        return
+      }
       await loadExternalMidiIfNeeded()
-      await loadArgumentFileIfNeeded()
       await checkAutoSave()
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps

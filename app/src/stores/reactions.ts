@@ -1,4 +1,4 @@
-import { autorun, observe, reaction } from "mobx"
+import { autorun, observe, reaction, toJS } from "mobx"
 import MIDIOutput from "../services/MIDIOutput"
 import RootStore from "./RootStore"
 
@@ -28,6 +28,21 @@ export const registerReactions = (rootStore: RootStore) => {
         rootStore.autoSaveService.onSongChanged()
       }
     },
+  )
+
+  // The original `isSaved` flag changes only once per dirty editing session.
+  // Observe the actual musical document so the Audio2MIDI debounce always sees
+  // the latest note/controller edit, including edits made while a save runs.
+  reaction(
+    () => [
+      rootStore.songStore.song.name,
+      rootStore.songStore.song.timebase,
+      rootStore.songStore.song.tracks.map((track) => ({
+        channel: track.channel,
+        events: toJS(track.events),
+      })),
+    ],
+    () => rootStore.audio2MidiEditorService.onSongChanged(),
   )
 }
 

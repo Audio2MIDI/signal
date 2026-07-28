@@ -1,9 +1,9 @@
 import styled from "@emotion/styled"
-import Forum from "mdi-react/ForumIcon"
 import Help from "mdi-react/HelpCircleIcon"
 import Settings from "mdi-react/SettingsIcon"
 import { CSSProperties, FC, MouseEvent, useCallback } from "react"
 import { getPlatform, isRunningInElectron } from "../../helpers/platform"
+import { useAudio2MidiEditor } from "../../hooks/useAudio2MidiEditor"
 import { useRootView } from "../../hooks/useRootView"
 import { useRouter } from "../../hooks/useRouter"
 import ArrangeIcon from "../../images/icons/arrange.svg"
@@ -14,7 +14,6 @@ import { Localized } from "../../localize/useLocalization"
 import { Tooltip } from "../ui/Tooltip"
 import { EditMenuButton } from "./EditMenuButton"
 import { FileMenuButton } from "./FileMenuButton"
-import { UserButton } from "./UserButton"
 
 const Container = styled.div`
   display: flex;
@@ -83,6 +82,7 @@ export const IconStyle: CSSProperties = {
 }
 
 export const Navigation: FC = () => {
+  const editor = useAudio2MidiEditor()
   const { setOpenSettingDialog, setOpenHelpDialog } = useRootView()
   const { path, setPath } = useRouter()
 
@@ -150,43 +150,47 @@ export const Navigation: FC = () => {
         </Tab>
       </Tooltip>
 
-      <Tooltip
-        title={
-          <>
-            <Localized name="switch-tab" /> [{envString.cmdOrCtrl}+2]
-          </>
-        }
-        delayDuration={500}
-      >
-        <Tab
-          className={path === "/arrange" ? "active" : undefined}
-          onMouseDown={onClickArrangeTab}
+      {editor.mode === "pro" && (
+        <Tooltip
+          title={
+            <>
+              <Localized name="switch-tab" /> [{envString.cmdOrCtrl}+2]
+            </>
+          }
+          delayDuration={500}
         >
-          <ArrangeIcon style={IconStyle} viewBox="0 0 128 128" />
-          <TabTitle>
-            <Localized name="arrange" />
-          </TabTitle>
-        </Tab>
-      </Tooltip>
+          <Tab
+            className={path === "/arrange" ? "active" : undefined}
+            onMouseDown={onClickArrangeTab}
+          >
+            <ArrangeIcon style={IconStyle} viewBox="0 0 128 128" />
+            <TabTitle>
+              <Localized name="arrange" />
+            </TabTitle>
+          </Tab>
+        </Tooltip>
+      )}
 
-      <Tooltip
-        title={
-          <>
-            <Localized name="switch-tab" /> [{envString.cmdOrCtrl}+3]
-          </>
-        }
-        delayDuration={500}
-      >
-        <Tab
-          className={path === "/tempo" ? "active" : undefined}
-          onMouseDown={onClickTempoTab}
+      {editor.mode === "pro" && (
+        <Tooltip
+          title={
+            <>
+              <Localized name="switch-tab" /> [{envString.cmdOrCtrl}+3]
+            </>
+          }
+          delayDuration={500}
         >
-          <TempoIcon style={IconStyle} viewBox="0 0 128 128" />
-          <TabTitle>
-            <Localized name="tempo" />
-          </TabTitle>
-        </Tab>
-      </Tooltip>
+          <Tab
+            className={path === "/tempo" ? "active" : undefined}
+            onMouseDown={onClickTempoTab}
+          >
+            <TempoIcon style={IconStyle} viewBox="0 0 128 128" />
+            <TabTitle>
+              <Localized name="tempo" />
+            </TabTitle>
+          </Tab>
+        </Tooltip>
+      )}
 
       <FlexibleSpacer />
 
@@ -205,23 +209,8 @@ export const Navigation: FC = () => {
               <Localized name="help" />
             </TabTitle>
           </Tab>
-
-          <Tab>
-            <Forum style={IconStyle} />
-            <TabTitle>
-              <a
-                href="https://discord.gg/XQxzNdDJse"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Discord
-              </a>
-            </TabTitle>
-          </Tab>
         </>
       )}
-
-      <UserButton />
     </Container>
   )
 }

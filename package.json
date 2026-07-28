@@ -5,13 +5,11 @@
   "scripts": {
     "start": "turbo run dev --parallel",
     "build": "npm run build:app",
-    "build:app": "turbo build && cpx \"app/dist/**/*\" dist",
+    "build:app": "npm run build -w @signal-app/player && npm run build -w dialog-hooks && npm run build -w app && rimraf dist && cpx \"app/dist/**/*\" dist",
     "serve": "npx http-server dist",
     "test": "turbo test",
     "lint": "turbo lint",
     "format": "turbo format",
-    "firebase": "npm --prefix functions run build && firebase emulators:start",
-    "firebase:deploy": "firebase deploy",
     "dev:electron": "concurrently \"npm run dev:electron -w app\" \"npm run dev --prefix electron\"",
     "build:electron": "npm run build:electron -w app && rimraf electron/dist_renderer && cpx \"app/dist/**/*\" electron/dist_renderer",
     "package:electron:darwin": "npm run build:electron && npm run package:darwin --prefix electron",
@@ -39,7 +37,8 @@
   },
   "workspaces": [
     "app",
-    "packages/*"
+    "packages/player",
+    "packages/dialog-hooks"
   ],
   "packageManager": "npm@11.3.0"
 }
