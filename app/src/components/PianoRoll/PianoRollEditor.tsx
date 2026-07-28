@@ -2,8 +2,10 @@ import styled from "@emotion/styled"
 import { SplitPaneProps } from "@ryohey/react-split-pane"
 import { FC, ReactNode } from "react"
 import { useAutoFocus } from "../../hooks/useAutoFocus"
+import { useAudio2MidiEditor } from "../../hooks/useAudio2MidiEditor"
 import { PianoRollScope, usePianoRoll } from "../../hooks/usePianoRoll"
 import { usePianoRollKeyboardShortcut } from "../../hooks/usePianoRollKeyboardShortcut"
+import { QuickActions } from "../Audio2MidiEditor/QuickActions"
 import EventList from "../EventEditor/EventList"
 import { PianoRollToolbar } from "../PianoRollToolbar/PianoRollToolbar"
 import { TrackList } from "../TrackList/TrackList"
@@ -38,6 +40,8 @@ const PaneLayout: FC<SplitPaneProps & { isShow: boolean; pane: ReactNode }> = ({
 
 const PianoRollPanes: FC = () => {
   const { showTrackList, showEventList } = usePianoRoll()
+  const editor = useAudio2MidiEditor()
+  const showAdvancedPanes = !editor.isEditorRoute || editor.mode === "pro"
 
   return (
     <div style={{ display: "flex", flexGrow: 1, position: "relative" }}>
@@ -46,7 +50,7 @@ const PianoRollPanes: FC = () => {
         minSize={280}
         pane1Style={{ display: "flex" }}
         pane2Style={{ display: "flex" }}
-        isShow={showTrackList}
+        isShow={showTrackList && showAdvancedPanes}
         pane={<TrackList />}
       >
         <PaneLayout
@@ -54,7 +58,7 @@ const PianoRollPanes: FC = () => {
           minSize={240}
           pane1Style={{ display: "flex" }}
           pane2Style={{ display: "flex" }}
-          isShow={showEventList}
+          isShow={showEventList && showAdvancedPanes}
           pane={<EventList />}
         >
           <PianoRoll />
@@ -71,6 +75,7 @@ export const PianoRollEditor: FC = () => {
   return (
     <PianoRollScope>
       <ColumnContainer {...keyboardShortcutProps} tabIndex={0} ref={ref}>
+        <QuickActions />
         <PianoRollToolbar />
         <PianoRollPanes />
       </ColumnContainer>

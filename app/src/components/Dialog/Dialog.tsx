@@ -6,6 +6,7 @@ import {
   Portal,
   DialogProps as Props,
   Root,
+  Title,
 } from "@radix-ui/react-dialog"
 import { FC } from "react"
 
@@ -59,6 +60,18 @@ const StyledContent = styled(Content)`
   }
 `
 
+const AccessibleTitle = styled(Title)`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+`
+
 export type DialogProps = Props & {
   style?: React.CSSProperties
 }
@@ -67,7 +80,10 @@ export const Dialog: FC<DialogProps> = ({ children, style, ...props }) => (
   <Root {...props}>
     <Portal>
       <StyledOverlay />
-      <StyledContent style={style}>{children}</StyledContent>
+      <StyledContent aria-describedby={undefined} style={style}>
+        <AccessibleTitle>Audio2MIDI</AccessibleTitle>
+        {children}
+      </StyledContent>
     </Portal>
   </Root>
 )

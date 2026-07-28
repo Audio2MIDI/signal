@@ -7,10 +7,7 @@ import {
 import React from "react"
 import { HelmetProvider } from "react-helmet-async"
 import { ActionDialog } from "../../components/Dialog/ActionDialog"
-import { isRunningInElectron } from "../../helpers/platform"
 import { ArrangeViewProvider } from "../../hooks/useArrangeView"
-import { AuthProvider } from "../../hooks/useAuth"
-import { CloudFileProvider } from "../../hooks/useCloudFile"
 import { ControlPaneProvider } from "../../hooks/useControlPane"
 import { ExportProvider } from "../../hooks/useExport"
 import { HistoryProvider } from "../../hooks/useHistory"
@@ -28,7 +25,6 @@ import { PromptDialog } from "../Dialog/PromptDialog"
 import { RootView } from "../RootView/RootView"
 import { GlobalCSS } from "../Theme/GlobalCSS"
 import { Toast } from "../ui/Toast"
-import { ElectronCallbackHandler } from "./ElectronCallbackHandler"
 import { LocalizationProvider } from "./LocalizationProvider"
 
 const rootStore = new RootStore()
@@ -47,29 +43,22 @@ export function App() {
                       <LocalizationProvider>
                         <RouterProvider>
                           <ExportProvider>
-                            <CloudFileProvider>
-                              <AuthProvider>
-                                <PianoRollProvider>
-                                  <ControlPaneProvider>
-                                    <ArrangeViewProvider>
-                                      <TempoEditorProvider>
-                                        <RootViewProvider>
-                                          <TrackMuteProvider>
-                                            <HistoryProvider>
-                                              <GlobalCSS />
-                                              {isRunningInElectron() && (
-                                                <ElectronCallbackHandler />
-                                              )}
-                                              <RootView />
-                                            </HistoryProvider>
-                                          </TrackMuteProvider>
-                                        </RootViewProvider>
-                                      </TempoEditorProvider>
-                                    </ArrangeViewProvider>
-                                  </ControlPaneProvider>
-                                </PianoRollProvider>
-                              </AuthProvider>
-                            </CloudFileProvider>
+                            <PianoRollProvider>
+                              <ControlPaneProvider>
+                                <ArrangeViewProvider>
+                                  <TempoEditorProvider>
+                                    <RootViewProvider>
+                                      <TrackMuteProvider>
+                                        <HistoryProvider>
+                                          <GlobalCSS />
+                                          <RootView />
+                                        </HistoryProvider>
+                                      </TrackMuteProvider>
+                                    </RootViewProvider>
+                                  </TempoEditorProvider>
+                                </ArrangeViewProvider>
+                              </ControlPaneProvider>
+                            </PianoRollProvider>
                           </ExportProvider>
                         </RouterProvider>
                       </LocalizationProvider>

@@ -28,5 +28,6 @@
       "@types/react": ["../node_modules/@types/react"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["src/components/SettingDialog/SoundFontScanPathList.tsx"]
 }

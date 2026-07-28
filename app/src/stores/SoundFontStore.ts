@@ -1,8 +1,6 @@
 import { SoundFont, SoundFontSynth } from "@signal-app/player"
 import { makeObservable, observable } from "mobx"
 import { makePersistable } from "mobx-persist-store"
-import { basename } from "../helpers/path"
-import { isRunningInElectron } from "../helpers/platform"
 import { IndexedDBStorage } from "../services/IndexedDBStorage"
 
 interface LocalSoundFont {
@@ -15,12 +13,6 @@ interface RemoteSoundFont {
   url: string
 }
 
-// electron only feature
-interface FileSoundFont {
-  type: "file"
-  path: string
-}
-
 export interface Metadata {
   name: string
   scanPath?: string // FileSoundFont scan path
@@ -28,26 +20,16 @@ export interface Metadata {
 
 export type SoundFontFile = Metadata & { id: number }
 
-export type SoundFontItem = LocalSoundFont | RemoteSoundFont | FileSoundFont
+export type SoundFontItem = LocalSoundFont | RemoteSoundFont
 
-const defaultSoundFonts: (SoundFontItem & Metadata & { id: number })[] =
-  isRunningInElectron()
-    ? [
-        {
-          id: -999, // Use negative number to avoid conflict with user saved soundfonts
-          type: "file",
-          path: "./assets/soundfonts/A320U.sf2",
-          name: "A320U.sf2 (Signal Factory Sound)",
-        },
-      ]
-    : [
-        {
-          id: -999, // Use negative number to avoid conflict with user saved soundfonts
-          type: "remote",
-          name: "A320U.sf2 (Signal Factory Sound)",
-          url: "https://cdn.jsdelivr.net/gh/ryohey/signal@4569a31/public/A320U.sf2",
-        },
-      ]
+const defaultSoundFonts: (SoundFontItem & Metadata & { id: number })[] = [
+  {
+    id: -999,
+    type: "remote",
+    name: "A320U.sf2 (Audio2MIDI Factory Sound)",
+    url: "https://cdn.jsdelivr.net/gh/ryohey/signal@4569a31/public/A320U.sf2",
+  },
+]
 
 export class SoundFontStore {
   private readonly storage: IndexedDBStorage<SoundFontItem, Metadata>
@@ -122,27 +104,7 @@ export class SoundFontStore {
   }
 
   scanSoundFonts = async () => {
-    if (!isRunningInElectron()) {
-      return
-    }
-
-    await this.clearScannedSoundFonts()
-
-    const items: { data: SoundFontItem; metadata: Metadata }[] = []
-
-    for (const scanPath of this.scanPaths) {
-      const files = await window.electronAPI.searchSoundFonts(scanPath)
-
-      const newItems = files.map((file) => ({
-        data: <SoundFontItem>{ type: "file", path: file },
-        metadata: <Metadata>{ name: basename(file), scanPath },
-      }))
-
-      items.push(...newItems)
-    }
-
-    await this.storage.saveMany(items)
-    await this.updateFileList()
+    return
   }
 
   private async clearScannedSoundFonts() {
@@ -177,9 +139,5 @@ async function loadSoundFont(soundfont: SoundFontItem) {
       return SoundFont.load(soundfont.data)
     case "remote":
       return await SoundFont.loadFromURL(soundfont.url)
-    case "file": {
-      const data = await window.electronAPI.readFile(soundfont.path)
-      return await SoundFont.load(data)
-    }
   }
 }

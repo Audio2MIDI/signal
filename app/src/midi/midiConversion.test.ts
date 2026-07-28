@@ -1,9 +1,14 @@
 import * as fs from "fs"
-import { AnyEvent } from "midifile-ts"
+import {
+  AnyEvent,
+  ControllerEvent,
+  SetTempoEvent,
+  TimeSignatureEvent,
+} from "midifile-ts"
 import * as path from "path"
 import { serialize } from "serializr"
 import { emptySong } from "../song/SongFactory"
-import { NoteEvent } from "../track"
+import { isNoteEvent, NoteEvent, TrackEventOf } from "../track"
 import Track from "../track/Track"
 import {
   noteOffMidiEvent,
@@ -98,6 +103,73 @@ describe("SongFile", () => {
         blue: 56,
         alpha: 78,
       })
+    })
+  })
+  describe("editor round trip", () => {
+    it("preserves tempo, time signature, CC and 10,000 notes", () => {
+      const song = emptySong()
+      song.tracks[0].addEvent<TrackEventOf<SetTempoEvent>>({
+        type: "meta",
+        subtype: "setTempo",
+        tick: 0,
+        microsecondsPerBeat: 600000,
+      })
+      song.tracks[0].addEvent<TrackEventOf<TimeSignatureEvent>>({
+        type: "meta",
+        subtype: "timeSignature",
+        tick: 0,
+        numerator: 3,
+        denominator: 4,
+        metronome: 24,
+        thirtyseconds: 8,
+      })
+      song.tracks[1].addEvent<TrackEventOf<ControllerEvent>>({
+        type: "channel",
+        subtype: "controller",
+        tick: 240,
+        controllerType: 64,
+        value: 127,
+      })
+      for (let index = 0; index < 10000; index += 1) {
+        song.tracks[1].addEvent<NoteEvent>({
+          type: "channel",
+          subtype: "note",
+          noteNumber: 36 + (index % 60),
+          tick: index * 30,
+          velocity: 40 + (index % 80),
+          duration: 120,
+        })
+      }
+
+      const restored = songFromMidi(songToMidi(song))
+      const conductorEvents = restored.tracks[0].events
+      const musicEvents = restored.tracks[1].events
+
+      expect(
+        conductorEvents.find(
+          (event) =>
+            event.type === "meta" &&
+            event.subtype === "setTempo" &&
+            event.microsecondsPerBeat === 600000,
+        ),
+      ).toMatchObject({ microsecondsPerBeat: 600000 })
+      expect(
+        conductorEvents.find(
+          (event) =>
+            event.type === "meta" &&
+            event.subtype === "timeSignature" &&
+            event.numerator === 3,
+        ),
+      ).toMatchObject({ numerator: 3, denominator: 4 })
+      expect(
+        musicEvents.find(
+          (event) =>
+            event.type === "channel" &&
+            event.subtype === "controller" &&
+            event.controllerType === 64,
+        ),
+      ).toMatchObject({ tick: 240, value: 127 })
+      expect(musicEvents.filter(isNoteEvent)).toHaveLength(10000)
     })
   })
   describe("createConductorTrackIfNeeded", () => {
