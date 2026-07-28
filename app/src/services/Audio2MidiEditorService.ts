@@ -1,5 +1,6 @@
 import { action, makeObservable, observable, runInAction } from "mobx"
 import { base64ToUint8Array, uint8ArrayToBase64 } from "../helpers/base64"
+import { downloadBlob } from "../helpers/Downloader"
 import { songFromArrayBuffer } from "../actions/file"
 import { songToMidi } from "../midi/midiConversion"
 import Song from "../song/Song"
@@ -73,6 +74,13 @@ function projectIdFromLocation(): string | null {
     /^\/editor\/([0-9a-f]{8}-[0-9a-f-]{27,})\/?$/i,
   )
   return match?.[1] ?? null
+}
+
+export function editorLoginUrl(
+  location: Pick<Location, "pathname" | "search"> = window.location,
+) {
+  const next = location.pathname
+  return `/?login=1&next=${encodeURIComponent(next)}`
 }
 
 function backupKey(projectId: string) {
@@ -233,7 +241,7 @@ export class Audio2MidiEditorService {
         { credentials: "include" },
       )
       if (response.status === 401) {
-        window.location.assign("/?login=1")
+        window.location.assign(editorLoginUrl())
         throw new Error(
           uiText(
             "Войдите в кабинет, чтобы открыть редактор",
@@ -286,13 +294,28 @@ export class Audio2MidiEditorService {
     const remoteUpdatedAt = manifest.draft
       ? new Date(manifest.draft.updated_at).getTime()
       : 0
+    const remoteRevision = manifest.draft?.revision ?? 0
+    const localMatchesBase =
+      local !== null && local.baseVersionId === this.baseVersionId
     const canRestoreLocal =
-      local !== null &&
-      local.baseVersionId === this.baseVersionId &&
+      localMatchesBase &&
+      local.revision === remoteRevision &&
       local.timestamp > remoteUpdatedAt
+    const hasLocalConflict =
+      local !== null && (!localMatchesBase || local.revision !== remoteRevision)
 
     let buffer: ArrayBuffer
-    if (canRestoreLocal) {
+    if (hasLocalConflict) {
+      buffer = base64ToUint8Array(local.midiData).buffer
+      runInAction(() => {
+        this.revision = local.revision
+        this.status = "conflict"
+        this.lastError = uiText(
+          "На сервере есть другой черновик. Выберите, какую копию оставить.",
+          "The server has a different draft. Choose which copy to keep.",
+        )
+      })
+    } else if (canRestoreLocal) {
       buffer = base64ToUint8Array(local.midiData).buffer
       runInAction(() => {
         this.revision = local.revision
@@ -315,7 +338,9 @@ export class Audio2MidiEditorService {
       const song = songFromArrayBuffer(buffer, undefined, `${this.title}.mid`)
       song.name = this.title
       song.isSaved = true
-      this.status = navigator.onLine ? "saved" : "offline"
+      if (this.status !== "conflict") {
+        this.status = navigator.onLine ? "saved" : "offline"
+      }
       return song
     })
   }
@@ -355,11 +380,18 @@ export class Audio2MidiEditorService {
     if (this.activeSave) {
       return this.activeSave
     }
+    const generationAtStart = this.changeGeneration
     const operation = this.performSave()
     this.activeSave = operation
     return operation.finally(() => {
       if (this.activeSave === operation) {
         this.activeSave = null
+      }
+      if (
+        this.changeGeneration > generationAtStart &&
+        this.saveTimer === null
+      ) {
+        this.scheduleSave()
       }
     })
   }
@@ -378,6 +410,10 @@ export class Audio2MidiEditorService {
     const snapshotGeneration = this.changeGeneration
     const bytes = songToMidi(this.songStore.song)
     await this.writeLocalBackup(bytes)
+    if (this.status === "conflict") {
+      this.savedGeneration = Math.max(this.savedGeneration, snapshotGeneration)
+      return
+    }
     if (!navigator.onLine) {
       runInAction(() => {
         this.status = "offline"
@@ -409,8 +445,8 @@ export class Audio2MidiEditorService {
         runInAction(() => {
           this.status = "conflict"
           this.lastError = uiText(
-            "На другом устройстве появилась более новая версия. Обновите страницу.",
-            "A newer version exists on another device. Reload this page.",
+            "На другом устройстве появился более новый черновик. Выберите, какую копию оставить.",
+            "A newer draft exists on another device. Choose which copy to keep.",
           )
         })
         return
@@ -430,7 +466,11 @@ export class Audio2MidiEditorService {
           snapshotGeneration,
         )
       })
-      await this.writeLocalBackup(bytes)
+      await this.writeLocalBackup(
+        snapshotGeneration === this.changeGeneration
+          ? bytes
+          : songToMidi(this.songStore.song),
+      )
       if (snapshotGeneration === this.changeGeneration) {
         runInAction(() => {
           this.songStore.song.isSaved = true
@@ -454,12 +494,21 @@ export class Audio2MidiEditorService {
     if (!this.projectId) {
       return
     }
+    if (this.status === "conflict") {
+      throw new Error(
+        this.lastError ||
+          uiText(
+            "Сначала разрешите конфликт черновиков",
+            "Resolve the draft conflict first",
+          ),
+      )
+    }
     while (this.savedGeneration < this.changeGeneration) {
       await this.saveNow()
       if (
-        this.status === "conflict" ||
-        this.status === "offline" ||
-        this.status === "error"
+        (["conflict", "offline", "error"] as EditorSaveStatus[]).includes(
+          this.status,
+        )
       ) {
         throw new Error(
           this.lastError ||
@@ -514,6 +563,95 @@ export class Audio2MidiEditorService {
       this.songStore.song.isSaved = true
     })
     await this.removeLocalBackup()
+  }
+
+  downloadConflictCopy() {
+    if (this.status !== "conflict") {
+      return
+    }
+    const bytes = songToMidi(this.songStore.song)
+    const safeTitle =
+      this.title.replace(/[\\/:*?"<>|]/g, " ").trim() || "Audio2MIDI"
+    downloadBlob(
+      new Blob([bytes], { type: "audio/midi" }),
+      `${safeTitle} — локальная копия.mid`,
+    )
+  }
+
+  async discardLocalConflict(): Promise<void> {
+    if (this.status !== "conflict") {
+      return
+    }
+    await this.removeLocalBackup()
+  }
+
+  async overwriteRemoteConflict(): Promise<void> {
+    if (!this.projectId || this.status !== "conflict") {
+      return
+    }
+    const bytes = songToMidi(this.songStore.song)
+    await this.writeLocalBackup(bytes)
+    try {
+      const manifestResponse = await fetch(
+        `/api/v1/me/projects/${this.projectId}/editor`,
+        { credentials: "include" },
+      )
+      if (!manifestResponse.ok) {
+        throw new Error(`HTTP ${manifestResponse.status}`)
+      }
+      const manifest = (await manifestResponse.json()) as EditorManifest
+      const remoteRevision = manifest.draft?.revision ?? 0
+      const remoteBaseVersion =
+        manifest.draft?.base_version_id ?? manifest.version.id
+      const checksum = await sha256Hex(bytes)
+      const response = await fetch(
+        `/api/v1/me/projects/${this.projectId}/editor/draft`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: {
+            "Content-Type": "audio/midi",
+            "If-Match": `"${remoteRevision}"`,
+            "X-Base-Version": remoteBaseVersion,
+            "X-Audio-Sha256": checksum,
+          },
+          body: bytes,
+        },
+      )
+      if (response.status === 409) {
+        runInAction(() => {
+          this.lastError = uiText(
+            "Черновик снова изменился на другом устройстве. Попробуйте ещё раз или загрузите серверную копию.",
+            "The draft changed again on another device. Try again or load the server copy.",
+          )
+        })
+        return
+      }
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      const payload = (await response.json()) as {
+        draft: { revision: number; base_version_id: string }
+      }
+      runInAction(() => {
+        this.revision = payload.draft.revision
+        this.baseVersionId = payload.draft.base_version_id
+        this.savedGeneration = this.changeGeneration
+        this.lastRemoteSaveAt = Date.now()
+        this.status = "saved"
+        this.lastError = ""
+        this.songStore.song.isSaved = true
+      })
+      await this.writeLocalBackup(bytes)
+    } catch (error) {
+      runInAction(() => {
+        this.status = "conflict"
+        this.lastError = `${uiText(
+          "Не удалось разрешить конфликт",
+          "Could not resolve the conflict",
+        )}: ${(error as Error).message}`
+      })
+    }
   }
 
   private async writeLocalBackup(bytes: Uint8Array) {

@@ -3,12 +3,16 @@
  */
 
 import { webcrypto } from "crypto"
+import { runInAction } from "mobx"
 import { songToMidi } from "../midi/midiConversion"
 import { uint8ArrayToBase64 } from "../helpers/base64"
 import { emptySong } from "../song/SongFactory"
 import { NoteEvent } from "../track"
 import { SongStore } from "../stores/SongStore"
-import { Audio2MidiEditorService } from "./Audio2MidiEditorService"
+import {
+  Audio2MidiEditorService,
+  editorLoginUrl,
+} from "./Audio2MidiEditorService"
 
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111"
 const VERSION_ID = "22222222-2222-4222-8222-222222222222"
@@ -41,6 +45,28 @@ function editableMidi() {
     velocity: 96,
   })
   return songToMidi(song)
+}
+
+function manifestWithDraft(revision: number, updatedAt: string) {
+  return {
+    project: { id: PROJECT_ID, title: "Test song" },
+    version: { id: VERSION_ID },
+    artifacts: [
+      {
+        id: "33333333-3333-4333-8333-333333333333",
+        role: "midi",
+        mime_type: "audio/midi",
+        stream_url: "/remote.mid",
+      },
+    ],
+    draft: {
+      base_version_id: VERSION_ID,
+      revision,
+      download_url: "/remote-draft.mid",
+      updated_at: updatedAt,
+    },
+    reference_audio: [],
+  }
 }
 
 describe("Audio2MidiEditorService", () => {
@@ -165,5 +191,168 @@ describe("Audio2MidiEditorService", () => {
     expect(
       songStore.song.tracks[1].events.some((event) => event.type === "channel"),
     ).toBe(true)
+  })
+
+  it("keeps a mismatched local revision in conflict without retrying it", async () => {
+    const midi = editableMidi()
+    localStorage.setItem(
+      `audio2midi_editor_backup:${PROJECT_ID}`,
+      JSON.stringify({
+        projectId: PROJECT_ID,
+        baseVersionId: VERSION_ID,
+        revision: 3,
+        midiData: uint8ArrayToBase64(midi),
+        timestamp: Date.now(),
+      }),
+    )
+    const fetchMock = jest.fn(async () =>
+      jsonResponse(
+        200,
+        manifestWithDraft(4, new Date(Date.now() + 60_000).toISOString()),
+      ),
+    )
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      value: fetchMock,
+    })
+
+    const songStore = new SongStore()
+    const service = new Audio2MidiEditorService(songStore)
+    songStore.song = await service.loadProject()
+    service.markDocumentReady()
+
+    expect(service.status).toBe("conflict")
+    expect(service.revision).toBe(3)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    songStore.song.tracks[1].updateEvent<NoteEvent>(0, { velocity: 77 })
+    service.onSongChanged()
+    await service.saveNow()
+
+    expect(service.status).toBe("conflict")
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("explicitly overwrites the latest remote draft after a conflict", async () => {
+    const midi = editableMidi()
+    localStorage.setItem(
+      `audio2midi_editor_backup:${PROJECT_ID}`,
+      JSON.stringify({
+        projectId: PROJECT_ID,
+        baseVersionId: VERSION_ID,
+        revision: 3,
+        midiData: uint8ArrayToBase64(midi),
+        timestamp: Date.now(),
+      }),
+    )
+    const fetchMock = jest.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === "PUT") {
+          expect(new Headers(init.headers).get("If-Match")).toBe('"4"')
+          expect(new Headers(init.headers).get("X-Base-Version")).toBe(
+            VERSION_ID,
+          )
+          return jsonResponse(200, {
+            draft: {
+              revision: 5,
+              base_version_id: VERSION_ID,
+            },
+          })
+        }
+        return jsonResponse(
+          200,
+          manifestWithDraft(4, new Date(Date.now() - 1000).toISOString()),
+        )
+      },
+    )
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      value: fetchMock,
+    })
+
+    const songStore = new SongStore()
+    const service = new Audio2MidiEditorService(songStore)
+    songStore.song = await service.loadProject()
+    service.markDocumentReady()
+    await service.overwriteRemoteConflict()
+
+    expect(service.status).toBe("saved")
+    expect(service.revision).toBe(5)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it("preserves the local copy when the remote draft changes again", async () => {
+    const midi = editableMidi()
+    localStorage.setItem(
+      `audio2midi_editor_backup:${PROJECT_ID}`,
+      JSON.stringify({
+        projectId: PROJECT_ID,
+        baseVersionId: VERSION_ID,
+        revision: 3,
+        midiData: uint8ArrayToBase64(midi),
+        timestamp: Date.now(),
+      }),
+    )
+    const fetchMock = jest.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === "PUT") {
+          return jsonResponse(409, { detail: "draft_revision_conflict" })
+        }
+        return jsonResponse(
+          200,
+          manifestWithDraft(4, new Date(Date.now() - 1000).toISOString()),
+        )
+      },
+    )
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      value: fetchMock,
+    })
+
+    const songStore = new SongStore()
+    const service = new Audio2MidiEditorService(songStore)
+    songStore.song = await service.loadProject()
+    service.markDocumentReady()
+    await service.overwriteRemoteConflict()
+
+    expect(service.status).toBe("conflict")
+    expect(service.revision).toBe(3)
+    expect(service.lastError).toMatch(/снова изменился|changed again/)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(
+      localStorage.getItem(`audio2midi_editor_backup:${PROJECT_ID}`),
+    ).not.toBeNull()
+  })
+
+  it("removes the local conflict backup before loading the server copy", async () => {
+    localStorage.setItem(
+      `audio2midi_editor_backup:${PROJECT_ID}`,
+      JSON.stringify({
+        projectId: PROJECT_ID,
+        baseVersionId: VERSION_ID,
+        revision: 1,
+        midiData: "",
+        timestamp: Date.now(),
+      }),
+    )
+    const service = new Audio2MidiEditorService(new SongStore())
+    runInAction(() => {
+      service.status = "conflict"
+    })
+
+    await service.discardLocalConflict()
+
+    expect(
+      localStorage.getItem(`audio2midi_editor_backup:${PROJECT_ID}`),
+    ).toBeNull()
+  })
+
+  it("preserves the editor route in the login return URL", () => {
+    expect(
+      editorLoginUrl({
+        pathname: `/editor/${PROJECT_ID}`,
+        search: "?version=2",
+      }),
+    ).toBe(`/?login=1&next=${encodeURIComponent(`/editor/${PROJECT_ID}`)}`)
   })
 })
