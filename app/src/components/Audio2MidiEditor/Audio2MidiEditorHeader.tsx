@@ -132,6 +132,80 @@ const PublishButton = styled.button`
   }
 `
 
+const ConflictPanel = styled.div`
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 0.55rem;
+  color: #fef3c7;
+  background: rgba(146, 64, 14, 0.22);
+
+  div:first-of-type {
+    min-width: 0;
+  }
+
+  strong,
+  small {
+    display: block;
+  }
+
+  strong {
+    font-size: 0.72rem;
+  }
+
+  small {
+    margin-top: 0.15rem;
+    color: #d6d3d1;
+    font-size: 0.6rem;
+  }
+
+  div:last-of-type {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.4rem;
+  }
+
+  button {
+    min-height: 1.9rem;
+    padding: 0 0.65rem;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 0.42rem;
+    color: #f4f4f5;
+    background: rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.61rem;
+  }
+
+  button[data-primary="true"] {
+    border-color: rgba(251, 191, 36, 0.38);
+    color: #fffbeb;
+    background: rgba(180, 83, 9, 0.35);
+  }
+
+  button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+  }
+
+  @media (max-width: 820px) {
+    align-items: stretch;
+    flex-direction: column;
+
+    div:last-of-type {
+      overflow-x: auto;
+    }
+
+    button {
+      flex: 0 0 auto;
+    }
+  }
+`
+
 const AudioBar = styled.div`
   display: flex;
   align-items: center;
@@ -192,6 +266,7 @@ export const Audio2MidiEditorHeader: FC = () => {
       }
   const [audioKind, setAudioKind] = useState("generated")
   const [publishError, setPublishError] = useState("")
+  const [resolvingConflict, setResolvingConflict] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
   const selectedAudio = useMemo(
     () =>
@@ -225,6 +300,25 @@ export const Audio2MidiEditorHeader: FC = () => {
   const alignReferenceAudio = () => {
     if (audioRef.current) {
       audioRef.current.currentTime = tickToSeconds(getSong(), position)
+    }
+  }
+
+  const keepLocalConflict = async () => {
+    setResolvingConflict(true)
+    try {
+      await editor.overwriteRemoteConflict()
+    } finally {
+      setResolvingConflict(false)
+    }
+  }
+
+  const useServerConflict = async () => {
+    setResolvingConflict(true)
+    try {
+      await editor.discardLocalConflict()
+      window.location.reload()
+    } finally {
+      setResolvingConflict(false)
     }
   }
 
@@ -303,12 +397,52 @@ export const Audio2MidiEditorHeader: FC = () => {
           {ru ? "Профи" : "Pro"}
         </button>
         <PublishButton
-          disabled={editor.status === "loading" || editor.status === "saving"}
+          disabled={
+            editor.status === "loading" ||
+            editor.status === "saving" ||
+            editor.status === "conflict"
+          }
           onClick={() => void publish()}
         >
           {ru ? "Сохранить версию" : "Save version"}
         </PublishButton>
       </Controls>
+      {editor.status === "conflict" && (
+        <ConflictPanel role="alert">
+          <div>
+            <strong>
+              {ru ? "Две версии черновика" : "Two draft versions"}
+            </strong>
+            <small>
+              {editor.lastError ||
+                (ru
+                  ? "Ваши локальные правки сохранены и не будут потеряны."
+                  : "Your local edits are preserved and will not be lost.")}
+            </small>
+          </div>
+          <div>
+            <button
+              disabled={resolvingConflict}
+              onClick={editor.downloadConflictCopy}
+            >
+              {ru ? "Скачать мою копию" : "Download my copy"}
+            </button>
+            <button
+              data-primary="true"
+              disabled={resolvingConflict}
+              onClick={() => void keepLocalConflict()}
+            >
+              {ru ? "Оставить мою версию" : "Keep my version"}
+            </button>
+            <button
+              disabled={resolvingConflict}
+              onClick={() => void useServerConflict()}
+            >
+              {ru ? "Загрузить серверную" : "Load server copy"}
+            </button>
+          </div>
+        </ConflictPanel>
+      )}
     </Shell>
   )
 }

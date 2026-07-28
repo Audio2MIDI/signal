@@ -27,5 +27,17 @@ export function useAudio2MidiEditor() {
     ),
     saveNow: useCallback(() => service.saveNow(), [service]),
     publishVersion: useCallback(() => service.publishVersion(), [service]),
+    downloadConflictCopy: useCallback(
+      () => service.downloadConflictCopy(),
+      [service],
+    ),
+    discardLocalConflict: useCallback(
+      () => service.discardLocalConflict(),
+      [service],
+    ),
+    overwriteRemoteConflict: useCallback(
+      () => service.overwriteRemoteConflict(),
+      [service],
+    ),
   }
 }
