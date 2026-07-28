@@ -24,7 +24,7 @@ export const NoteLabels: FC<NoteLabelProps> = ({ rects, zIndex }) => {
     }
 
     const loadTexture = async () => {
-      const texture = await createTexture(gl, "/font-atlas.png")
+      const texture = await createTexture(gl, "/editor/font-atlas.png")
       setTexture(texture)
     }
     loadTexture()

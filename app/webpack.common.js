@@ -11,6 +11,7 @@ module.exports = {
   },
   output: {
     filename: "[name]-[chunkhash].js",
+    publicPath: "/editor/",
     clean: true,
   },
   module: {
