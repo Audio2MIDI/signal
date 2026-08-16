@@ -183,9 +183,20 @@ async function fetchBytes(url: string): Promise<ArrayBuffer> {
 
 export class Audio2MidiEditorService {
   readonly projectId = projectIdFromLocation()
+  readonly compactTelegram =
+    Boolean(
+      (
+        window as typeof window & {
+          Telegram?: { WebApp?: { initData?: string } }
+        }
+      ).Telegram?.WebApp?.initData,
+    ) && window.matchMedia("(max-width: 820px)").matches
   title = "Audio2MIDI"
   mode: EditorMode =
-    localStorage.getItem("audio2midi_editor_mode") === "pro" ? "pro" : "simple"
+    !this.compactTelegram &&
+    localStorage.getItem("audio2midi_editor_mode") === "pro"
+      ? "pro"
+      : "simple"
   status: EditorSaveStatus = "loading"
   revision = 0
   baseVersionId: string | null = null
@@ -218,8 +229,9 @@ export class Audio2MidiEditorService {
   }
 
   setMode(mode: EditorMode) {
-    this.mode = mode
-    localStorage.setItem("audio2midi_editor_mode", mode)
+    const nextMode = this.compactTelegram && mode === "pro" ? "simple" : mode
+    this.mode = nextMode
+    localStorage.setItem("audio2midi_editor_mode", nextMode)
   }
 
   async loadProject(): Promise<Song> {

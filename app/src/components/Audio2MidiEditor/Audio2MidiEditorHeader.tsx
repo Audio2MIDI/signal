@@ -267,6 +267,7 @@ export const Audio2MidiEditorHeader: FC = () => {
   const [audioKind, setAudioKind] = useState("generated")
   const [publishError, setPublishError] = useState("")
   const [resolvingConflict, setResolvingConflict] = useState(false)
+  const [browserBusy, setBrowserBusy] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
   const selectedAudio = useMemo(
     () =>
@@ -319,6 +320,48 @@ export const Audio2MidiEditorHeader: FC = () => {
       window.location.reload()
     } finally {
       setResolvingConflict(false)
+    }
+  }
+
+  const openInBrowser = async () => {
+    if (!editor.projectId || browserBusy) {
+      return
+    }
+    setBrowserBusy(true)
+    setPublishError("")
+    try {
+      const response = await fetch("/api/v1/me/browser-handoffs", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: editor.projectId }),
+      })
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      const body = (await response.json()) as { handoff_url: string }
+      const target = new URL(
+        body.handoff_url,
+        window.location.origin,
+      ).toString()
+      const telegram = (
+        window as typeof window & {
+          Telegram?: { WebApp?: { openLink?: (url: string) => void } }
+        }
+      ).Telegram?.WebApp
+      if (telegram?.openLink) {
+        telegram.openLink(target)
+      } else {
+        window.open(target, "_blank", "noopener,noreferrer")
+      }
+    } catch {
+      setPublishError(
+        ru
+          ? "Не удалось открыть полную версию"
+          : "Could not open the full editor",
+      )
+    } finally {
+      setBrowserBusy(false)
     }
   }
 
@@ -390,12 +433,25 @@ export const Audio2MidiEditorHeader: FC = () => {
         >
           {ru ? "Простой" : "Simple"}
         </button>
-        <button
-          data-active={editor.mode === "pro"}
-          onClick={() => editor.setMode("pro")}
-        >
-          {ru ? "Профи" : "Pro"}
-        </button>
+        {!editor.compactTelegram && (
+          <button
+            data-active={editor.mode === "pro"}
+            onClick={() => editor.setMode("pro")}
+          >
+            {ru ? "Профи" : "Pro"}
+          </button>
+        )}
+        {editor.compactTelegram && (
+          <button disabled={browserBusy} onClick={() => void openInBrowser()}>
+            {browserBusy
+              ? ru
+                ? "Открываем…"
+                : "Opening…"
+              : ru
+                ? "Полная версия ↗"
+                : "Full editor ↗"}
+          </button>
+        )}
         <PublishButton
           disabled={
             editor.status === "loading" ||

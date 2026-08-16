@@ -15,6 +15,7 @@ export function useAudio2MidiEditor() {
   return {
     projectId: service.projectId,
     isEditorRoute: service.isEditorRoute,
+    compactTelegram: service.compactTelegram,
     title,
     mode,
     status,
