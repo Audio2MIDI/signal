@@ -162,8 +162,20 @@ export function songToMidi(song: Song) {
   return writeMidiFile(rawTracks, song.timebase)
 }
 
+export function midiDownloadFileName(
+  song: Pick<Song, "filepath" | "name">,
+): string {
+  const name = (song.filepath || song.name)
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .split("")
+    .map((char) => (char.charCodeAt(0) < 32 ? "_" : char))
+    .join("")
+    .trim()
+  return name ? (/\.mid$/i.test(name) ? name : `${name}.mid`) : "Audio2MIDI.mid"
+}
+
 export function downloadSongAsMidi(song: Song) {
   const bytes = songToMidi(song)
   const blob = new Blob([bytes], { type: "application/octet-stream" })
-  downloadBlob(blob, song.filepath.length > 0 ? song.filepath : "no name.mid")
+  downloadBlob(blob, midiDownloadFileName(song))
 }
