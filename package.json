@@ -16,7 +16,8 @@
     "package:electron": "npm run build:electron && npm run package --prefix electron",
     "make:electron": "npm run build:electron && npm run make:mas --prefix electron",
     "make:darwin": "npm run build:electron && npm run make:darwin --prefix electron",
-    "make:win": "npm run build:electron && npm run make:win --prefix electron"
+    "make:win": "npm run build:electron && npm run make:win --prefix electron",
+    "test:merge-security": "node --test scripts/deepmerge-security.test.cjs"
   },
   "repository": {
     "type": "git",
@@ -32,12 +33,16 @@
   "devDependencies": {
     "prettier": "^3.5.3",
     "rimraf": "^6.0.1",
-    "turbo": "^2.5.2"
+    "turbo": "^2.5.2",
+    "deepmerge": "file:vendor/deepmerge"
   },
   "workspaces": [
     "app",
     "packages/player",
     "packages/dialog-hooks"
   ],
-  "packageManager": "npm@11.3.0"
+  "packageManager": "npm@11.3.0",
+  "overrides": {
+    "deepmerge": "$deepmerge"
+  }
 }

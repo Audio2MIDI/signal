@@ -83,7 +83,7 @@ const api = ({
     const files = await readdir(path, { withFileTypes: true })
     return files
       .filter((f) => f.isFile() && f.name.endsWith(".sf2"))
-      .map((f) => join(f.path, f.name))
+      .map((f) => join(path, f.name))
   },
   showSaveDialog: async () => {
     const fileObj = await dialog.showSaveDialog({

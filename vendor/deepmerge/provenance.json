@@ -1,0 +1,5 @@
+{
+  "upstream_package": "deepmerge@4.3.1",
+  "upstream_bundle_sha256": "2e5160f84a1141bd927264afe4d15766f1e6cf07daef182b37ff53fea121de7d",
+  "patched_bundle_sha256": "597c830f784db7dab142e9981648bc64ae6cc0d586a5d6259baf834e4603b51f"
+}
