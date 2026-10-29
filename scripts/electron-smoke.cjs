@@ -13,8 +13,7 @@ for (const name of ["userData", "sessionData", "logs"]) {
   app.setPath(name, dir)
 }
 app.setName("Audio2MIDI Isolated Smoke")
-if (process.env.CI && process.platform === "linux")
-  app.commandLine.appendSwitch("no-sandbox")
+process.argv = [process.argv[0], __filename]
 Object.defineProperty(app, "isPackaged", { value: true })
 const fixtures = path.join(profile, "soundfonts")
 fs.mkdirSync(fixtures)
