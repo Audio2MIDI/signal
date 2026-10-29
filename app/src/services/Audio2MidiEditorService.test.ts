@@ -270,7 +270,7 @@ describe("Audio2MidiEditorService", () => {
     await saving
     expect(draftWrites).toHaveLength(1)
     expect(draftWrites[0].headers).toMatchObject({
-      "If-Match": '\"1\"',
+      "If-Match": '"1"',
       "X-Base-Version": VERSION_ID,
     })
     const saved = runInAction(() =>
