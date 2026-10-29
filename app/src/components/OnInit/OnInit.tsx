@@ -2,6 +2,7 @@ import { useProgress } from "dialog-hooks"
 import { FC, useEffect, useState } from "react"
 import { useSetSong } from "../../actions"
 import { songFromArrayBuffer } from "../../actions/file"
+import { initializeEditorDocument } from "../../services/initializeEditorDocument"
 import { useAutoSave } from "../../hooks/useAutoSave"
 import { useStores } from "../../hooks/useStores"
 import { useLocalization } from "../../localize/useLocalization"
@@ -12,6 +13,7 @@ export const OnInit: FC = () => {
   const rootStore = useStores()
   const setSong = useSetSong()
 
+  const [audioStatus, setAudioStatus] = useState("")
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const [isAutoSaveDialogOpen, setIsAutoSaveDialogOpen] = useState(false)
@@ -76,10 +78,21 @@ export const OnInit: FC = () => {
 
   useEffect(() => {
     ;(async () => {
-      await init()
       if (rootStore.audio2MidiEditorService.isEditorRoute) {
+        // Editing and cloud saves must not depend on an external sound bank.
+        setAudioStatus(
+          "Звук загружается. Редактирование и сохранение уже доступны.",
+        )
         try {
-          const song = await rootStore.audio2MidiEditorService.loadProject()
+          const song = await initializeEditorDocument(
+            () => rootStore.init(),
+            () => rootStore.audio2MidiEditorService.loadProject(),
+            () => setAudioStatus(""),
+            () =>
+              setAudioStatus(
+                "Звук недоступен. Редактирование и сохранение работают; перезагрузите страницу, чтобы повторить загрузку звука.",
+              ),
+          )
           setSong(song)
           rootStore.audio2MidiEditorService.markDocumentReady()
         } catch (e) {
@@ -88,6 +101,7 @@ export const OnInit: FC = () => {
         }
         return
       }
+      await init()
       await loadExternalMidiIfNeeded()
       await checkAutoSave()
     })()
@@ -96,6 +110,24 @@ export const OnInit: FC = () => {
 
   return (
     <>
+      {audioStatus && (
+        <div
+          role="status"
+          style={{
+            position: "fixed",
+            bottom: 8,
+            left: 8,
+            zIndex: 100,
+            padding: "6px 10px",
+            background: "#18181b",
+            color: "#e4e4e7",
+            fontSize: 12,
+            pointerEvents: "none",
+          }}
+        >
+          {audioStatus}
+        </div>
+      )}
       <InitializeErrorDialog
         open={isErrorDialogOpen}
         message={errorMessage}
