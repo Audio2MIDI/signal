@@ -24,7 +24,18 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - run: npm ci
-      - run: npm audit --audit-level=moderate
+      - run: npm run test:merge-security
+      - run: npm audit --audit-level=low
       - run: npm run lint
       - run: npm run build:app
       - run: npm test
+      - run: npm ci --prefix electron
+      - run: npm audit --prefix electron --audit-level=low
+      - run: npm ci --prefix electron/scripts/generate-appx-manifest
+      - run: npm audit --prefix electron/scripts/generate-appx-manifest --audit-level=low
+      - run: npm ci --prefix electron/scripts/generate-ico
+      - run: npm audit --prefix electron/scripts/generate-ico --audit-level=low
+      - run: npm run build --prefix electron
+      - run: npm run build:electron
+      - run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64
+      - run: xvfb-run -a npm run test:smoke --prefix electron

@@ -1,0 +1,23 @@
+--- deepmerge-4.3.1/dist/cjs.js
++++ vendor/deepmerge/index.cjs
+@@ -78,0 +79,8 @@
++function keyIsForbidden(key) {
++ return key === '__proto__' || key === 'constructor' || key === 'prototype'
++}
++
++function setOwn(destination, key, value) {
++ Object.defineProperty(destination, key, {value: value, writable: true, enumerable: true, configurable: true})
++}
++
+@@ -83 +91,2 @@
+-			destination[key] = cloneUnlessOtherwiseSpecified(target[key], options);
++            if (keyIsForbidden(key)) return
++			setOwn(destination, key, cloneUnlessOtherwiseSpecified(target[key], options));
+@@ -86,0 +96 @@
++        if (keyIsForbidden(key)) return
+@@ -92 +102 @@
+-			destination[key] = getMergeFunction(key, options)(target[key], source[key], options);
++			setOwn(destination, key, getMergeFunction(key, options)(target[key], source[key], options));
+@@ -94 +104 @@
+-			destination[key] = cloneUnlessOtherwiseSpecified(source[key], options);
++			setOwn(destination, key, cloneUnlessOtherwiseSpecified(source[key], options));

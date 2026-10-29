@@ -127,7 +127,7 @@ const createWindow = (): void => {
     mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(
-      path.join(__dirname, "..", "dist_renderer", "edit.html"),
+      path.join(__dirname, "..", "dist_renderer", "index.html"),
     )
   }
 

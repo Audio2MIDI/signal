@@ -1,0 +1,8 @@
+{
+  "name": "@audio2midi/deepmerge",
+  "version": "4.3.1-audio2midi.1",
+  "private": true,
+  "license": "MIT",
+  "main": "index.cjs",
+  "types": "index.d.ts"
+}
