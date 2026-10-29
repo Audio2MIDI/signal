@@ -166,7 +166,10 @@ export function midiDownloadFileName(
   song: Pick<Song, "filepath" | "name">,
 ): string {
   const name = (song.filepath || song.name)
-    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .split("")
+    .map((char) => (char.charCodeAt(0) < 32 ? "_" : char))
+    .join("")
     .trim()
   return name ? (/\.mid$/i.test(name) ? name : `${name}.mid`) : "Audio2MIDI.mid"
 }
