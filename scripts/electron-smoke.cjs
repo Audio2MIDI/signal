@@ -20,8 +20,9 @@ fs.mkdirSync(fixtures)
 fs.writeFileSync(path.join(fixtures, "fixture.sf2"), "")
 fs.writeFileSync(path.join(fixtures, "ignore.txt"), "")
 fs.mkdirSync(path.join(fixtures, "directory.sf2"))
+let phase = "startup"
 const timer = setTimeout(
-  () => finish(new Error("Desktop smoke timed out")),
+  () => finish(new Error(`Desktop smoke timed out: ${phase}`)),
   30000,
 )
 let finished = false
@@ -44,6 +45,11 @@ process.on("uncaughtException", finish)
 process.on("unhandledRejection", finish)
 app.on("browser-window-created", (_, win) => {
   win.hide()
+  // The test uses local assets and synthetic IPC only. Never contact auth/API/font hosts.
+  win.webContents.session.webRequest.onBeforeRequest(
+    { urls: ["http://*/*", "https://*/*"] },
+    (_, callback) => callback({ cancel: true }),
+  )
   win.webContents.on("render-process-gone", (_, details) =>
     finish(new Error(JSON.stringify(details))),
   )
