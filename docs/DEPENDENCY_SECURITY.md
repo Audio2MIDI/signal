@@ -31,7 +31,7 @@ instead of removed Dirent.path; packaged startup loads the emitted index.html;
 desktop webpack uses relative asset paths, while web retains /editor/ paths.
 Main/preload compilation now runs tsc --noEmit before Rollup.
 
-The smoke harness uses temporary userData/sessionData/logs directories before
+The smoke harness blocks HTTP/S requests and uses temporary userData/sessionData/logs directories before
 loading main code. It verifies the actual renderer, preload bridge and soundfont
 IPC against synthetic files. It forces packaged mode to avoid a dev server.
 On Linux CI only, the test harness disables Chromium sandboxing under Xvfb; this

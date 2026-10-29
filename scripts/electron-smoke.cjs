@@ -44,6 +44,7 @@ function finish(error) {
 process.on("uncaughtException", finish)
 process.on("unhandledRejection", finish)
 app.on("browser-window-created", (_, win) => {
+  phase = "window-created"
   win.hide()
   // The test uses local assets and synthetic IPC only. Never contact auth/API/font hosts.
   win.webContents.session.webRequest.onBeforeRequest(
@@ -61,6 +62,7 @@ app.on("browser-window-created", (_, win) => {
     },
   )
   win.webContents.once("did-finish-load", async () => {
+    phase = "renderer-loaded"
     try {
       assert.equal(app.getPath("userData"), path.join(profile, "userData"))
       let state
@@ -73,6 +75,7 @@ app.on("browser-window-created", (_, win) => {
       }
       assert.ok(state.text.includes("Track 1"), state.text)
       assert.equal(state.bridge, "object")
+      phase = "soundfont-ipc"
       const files = await win.webContents.executeJavaScript(
         `window.electronAPI.searchSoundFonts(${JSON.stringify(fixtures)})`,
       )
