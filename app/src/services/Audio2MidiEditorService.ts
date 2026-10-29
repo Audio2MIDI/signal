@@ -208,6 +208,8 @@ export class Audio2MidiEditorService {
   private changeGeneration = 0
   private savedGeneration = 0
   private activeSave: Promise<void> | null = null
+  private activePublish: Promise<void> | null = null
+  private publishingRequest = false
   private documentReady = false
   private restoredLocalNeedsSync = false
 
@@ -389,6 +391,14 @@ export class Audio2MidiEditorService {
   }
 
   saveNow(): Promise<void> {
+    // A published draft becomes a new base version. Do not PUT against its old
+    // revision while the version request is outstanding.
+    if (this.publishingRequest && this.activePublish) {
+      return this.activePublish.then(
+        () => this.saveNow(),
+        () => this.saveNow(),
+      )
+    }
     if (this.activeSave) {
       return this.activeSave
     }
@@ -502,7 +512,17 @@ export class Audio2MidiEditorService {
     }
   }
 
-  async publishVersion(): Promise<void> {
+  publishVersion(): Promise<void> {
+    if (this.activePublish) return this.activePublish
+    const operation = this.performPublish()
+    this.activePublish = operation
+    return operation.finally(() => {
+      this.activePublish = null
+      this.publishingRequest = false
+    })
+  }
+
+  private async performPublish(): Promise<void> {
     if (!this.projectId) {
       return
     }
@@ -539,6 +559,8 @@ export class Audio2MidiEditorService {
         ),
       )
     }
+    const publishedGeneration = this.changeGeneration
+    this.publishingRequest = true
     const sessionKey = `audio2midi_publish_key:${this.projectId}:${this.revision}`
     const idempotencyKey =
       sessionStorage.getItem(sessionKey) ?? crypto.randomUUID()
@@ -570,11 +592,17 @@ export class Audio2MidiEditorService {
     runInAction(() => {
       this.baseVersionId = payload.version.id
       this.revision = 0
-      this.savedGeneration = this.changeGeneration
-      this.status = "published"
-      this.songStore.song.isSaved = true
+      this.savedGeneration = publishedGeneration
+      const unchanged = publishedGeneration === this.changeGeneration
+      this.status = unchanged ? "published" : "saving"
+      this.songStore.song.isSaved = unchanged
     })
-    await this.removeLocalBackup()
+    if (publishedGeneration === this.changeGeneration) {
+      await this.removeLocalBackup()
+    } else {
+      await this.writeLocalBackup(songToMidi(this.songStore.song))
+      this.scheduleSave()
+    }
   }
 
   downloadConflictCopy() {

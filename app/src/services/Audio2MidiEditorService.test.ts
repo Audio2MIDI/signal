@@ -4,10 +4,10 @@
 
 import { webcrypto } from "crypto"
 import { runInAction } from "mobx"
-import { songToMidi } from "../midi/midiConversion"
+import { songFromMidi, songToMidi } from "../midi/midiConversion"
 import { uint8ArrayToBase64 } from "../helpers/base64"
 import { emptySong } from "../song/SongFactory"
-import { NoteEvent } from "../track"
+import { isNoteEvent, NoteEvent } from "../track"
 import { SongStore } from "../stores/SongStore"
 import {
   Audio2MidiEditorService,
@@ -157,6 +157,128 @@ describe("Audio2MidiEditorService", () => {
     expect(draftSaveCount).toBe(2)
     expect(service.status).toBe("published")
     expect(service.revision).toBe(0)
+  })
+
+  it("preserves edits made while the version POST is in flight", async () => {
+    const newVersion = "44444444-4444-4444-8444-444444444444"
+    let releasePublish!: () => void
+    const publishGate = new Promise<void>((resolve) => {
+      releasePublish = resolve
+    })
+    let postStarted!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      postStarted = resolve
+    })
+    const draftWrites: RequestInit[] = []
+    const fetchMock = jest.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.endsWith(`/projects/${PROJECT_ID}/editor`) && !init?.method) {
+          return jsonResponse(200, manifestWithDraft(1, "2026-01-01T00:00:00Z"))
+        }
+        if (url.endsWith("/remote-draft.mid"))
+          return midiResponse(editableMidi())
+        if (url.endsWith("/editor/versions")) {
+          postStarted()
+          await publishGate
+          return jsonResponse(200, { version: { id: newVersion } })
+        }
+        if (url.endsWith("/editor/draft") && init?.method === "PUT") {
+          draftWrites.push(init)
+          return jsonResponse(200, {
+            draft: { revision: 1, base_version_id: newVersion },
+          })
+        }
+        throw new Error(`Unexpected fetch: ${url}`)
+      },
+    )
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      value: fetchMock,
+    })
+    const store = new SongStore()
+    const service = new Audio2MidiEditorService(store)
+    store.song = await service.loadProject()
+    service.markDocumentReady()
+    const publishing = service.publishVersion()
+    await postGate
+    const note = store.song.tracks[1].events.find(isNoteEvent)!
+    store.song.tracks[1].updateEvent<NoteEvent>(note.id, { noteNumber: 65 })
+    service.onSongChanged()
+    const concurrentSave = service.saveNow()
+    expect(draftWrites).toHaveLength(0)
+    releasePublish()
+    await publishing
+    await concurrentSave
+    expect(draftWrites).toHaveLength(1)
+    expect(draftWrites[0].headers).toMatchObject({
+      "If-Match": '"0"',
+      "X-Base-Version": newVersion,
+    })
+    const saved = runInAction(() =>
+      songFromMidi(new Uint8Array(draftWrites[0].body as Uint8Array)),
+    )
+    expect(saved.tracks[1].events.find(isNoteEvent)?.noteNumber).toBe(65)
+    expect(service.revision).toBe(1)
+    expect(service.status).toBe("saved")
+  })
+
+  it("saves newer edits when the pending version request fails", async () => {
+    let rejectPublish!: (error: Error) => void
+    const publishGate = new Promise<void>((_resolve, reject) => {
+      rejectPublish = reject
+    })
+    let postStarted!: () => void
+    const postGate = new Promise<void>((resolve) => {
+      postStarted = resolve
+    })
+    const draftWrites: RequestInit[] = []
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      value: jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.endsWith(`/projects/${PROJECT_ID}/editor`) && !init?.method)
+          return jsonResponse(200, manifestWithDraft(1, "2026-01-01T00:00:00Z"))
+        if (url.endsWith("/remote-draft.mid"))
+          return midiResponse(editableMidi())
+        if (url.endsWith("/editor/versions")) {
+          postStarted()
+          await publishGate
+        }
+        if (url.endsWith("/editor/draft") && init?.method === "PUT") {
+          draftWrites.push(init)
+          return jsonResponse(200, {
+            draft: { revision: 2, base_version_id: VERSION_ID },
+          })
+        }
+        throw new Error(`Unexpected fetch: ${url}`)
+      }),
+    })
+    const store = new SongStore()
+    const service = new Audio2MidiEditorService(store)
+    store.song = await service.loadProject()
+    service.markDocumentReady()
+    const publishing = service.publishVersion()
+    const failure = expect(publishing).rejects.toThrow("connection interrupted")
+    await postGate
+    const note = store.song.tracks[1].events.find(isNoteEvent)!
+    store.song.tracks[1].updateEvent<NoteEvent>(note.id, { noteNumber: 67 })
+    service.onSongChanged()
+    const saving = service.saveNow()
+    rejectPublish(new Error("connection interrupted"))
+    await failure
+    await saving
+    expect(draftWrites).toHaveLength(1)
+    expect(draftWrites[0].headers).toMatchObject({
+      "If-Match": '"1"',
+      "X-Base-Version": VERSION_ID,
+    })
+    const saved = runInAction(() =>
+      songFromMidi(new Uint8Array(draftWrites[0].body as Uint8Array)),
+    )
+    expect(saved.tracks[1].events.find(isNoteEvent)?.noteNumber).toBe(67)
+    expect(service.revision).toBe(2)
+    expect(service.status).toBe("saved")
   })
 
   it("restores the local MIDI backup while offline", async () => {

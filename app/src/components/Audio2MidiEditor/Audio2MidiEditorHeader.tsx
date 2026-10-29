@@ -61,13 +61,13 @@ const Identity = styled.div`
   }
 
   strong {
-    font-size: 0.78rem;
+    font-size: 0.9rem;
   }
 
   small {
     margin-top: 0.18rem;
-    color: #71717a;
-    font-size: 0.58rem;
+    color: #a1a1aa;
+    font-size: 0.75rem;
   }
 `
 
@@ -84,7 +84,7 @@ const Controls = styled.div`
     color: #d4d4d8;
     background: rgba(255, 255, 255, 0.04);
     font: inherit;
-    font-size: 0.66rem;
+    font-size: 0.8rem;
   }
 
   button {
@@ -110,7 +110,7 @@ const Status = styled.span`
   align-items: center;
   gap: 0.35rem;
   color: #a1a1aa;
-  font-size: 0.6rem;
+  font-size: 0.75rem;
 
   &::before {
     width: 0.42rem;
@@ -160,7 +160,7 @@ const ConflictPanel = styled.div`
   small {
     margin-top: 0.15rem;
     color: #d6d3d1;
-    font-size: 0.6rem;
+    font-size: 0.75rem;
   }
 
   div:last-of-type {
