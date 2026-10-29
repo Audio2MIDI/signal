@@ -34,7 +34,9 @@ Main/preload compilation now runs tsc --noEmit before Rollup.
 The smoke harness blocks HTTP/S requests and uses temporary userData/sessionData/logs directories before
 loading main code. It verifies the actual renderer, preload bridge and soundfont
 IPC against synthetic files. It forces packaged mode to avoid a dev server.
-On Linux CI only, the test harness disables Chromium sandboxing under Xvfb; this
+On Linux CI only, the test launcher uses SwiftShader software rendering and
+disables Chromium sandboxing under Xvfb; the test window disables background
+throttling so renderer inspection can run without a desktop session. This
 does not alter application runtime configuration. Profiles are left under the
 OS temp directory for diagnostics and contain no real user information.
 

@@ -45,7 +45,9 @@ process.on("uncaughtException", finish)
 process.on("unhandledRejection", finish)
 app.on("browser-window-created", (_, win) => {
   phase = "window-created"
-  win.hide()
+  win.webContents.setBackgroundThrottling(false)
+  if (process.env.CI && process.platform === "linux") win.showInactive()
+  else win.hide()
   // The test uses local assets and synthetic IPC only. Never contact auth/API/font hosts.
   win.webContents.session.webRequest.onBeforeRequest(
     { urls: ["http://*/*", "https://*/*"] },
